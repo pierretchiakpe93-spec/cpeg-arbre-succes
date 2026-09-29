@@ -1,0 +1,11 @@
+{
+  "name": "CPEG L’Arbre de Succès — Gestion scolaire",
+  "short_name": "CPEG Gestion",
+  "description": "Application de gestion scolaire",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f7fa",
+  "theme_color": "#17253b"
+}
