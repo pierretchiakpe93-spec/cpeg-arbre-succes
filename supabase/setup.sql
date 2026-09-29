@@ -1,4 +1,4 @@
--- École Horizon / Arbre de Succès : schéma Supabase initial
+-- CPEG L’Arbre de Succès : schéma Supabase initial
 -- À exécuter une seule fois dans le SQL Editor du projet.
 -- Ne contient ni utilisateurs réels, ni clé secrète.
 
@@ -182,6 +182,10 @@ grant select, insert, update, delete on public.school_records to authenticated;
 grant select, insert, update, delete on public.role_permissions to authenticated;
 grant select, insert, update, delete on public.student_links to authenticated;
 grant select, insert, update, delete on public.teacher_classes to authenticated;
+revoke all on function public.current_school_id() from public, anon;
+revoke all on function public.current_app_role() from public, anon;
+revoke all on function public.role_can(text, boolean) from public, anon;
+revoke all on function public.record_scope_ok(text, uuid, text, uuid) from public, anon;
 grant execute on function public.current_school_id() to authenticated;
 grant execute on function public.current_app_role() to authenticated;
 grant execute on function public.role_can(text, boolean) to authenticated;
