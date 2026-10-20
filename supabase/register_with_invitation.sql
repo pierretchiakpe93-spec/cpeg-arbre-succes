@@ -26,7 +26,7 @@ as $$
   select exists (
     select 1
     from public.registration_invites i
-    where i.code_hash = encode(extensions.digest(upper(trim(coalesce(p_code,''))), 'sha256'), 'hex')
+    where i.code_hash = encode(digest(upper(trim(coalesce(p_code,''))), 'sha256'), 'hex')
       and i.redeemed_at is null
       and i.expires_at > now()
   );
@@ -60,9 +60,9 @@ begin
     raise exception 'La durée doit être comprise entre 1 et 30 jours.';
   end if;
 
-  v_code := upper(substr(encode(extensions.gen_random_bytes(8), 'hex'), 1, 12));
+  v_code := upper(substr(encode(gen_random_bytes(8), 'hex'), 1, 12));
   insert into public.registration_invites(school_id, role, code_hash, created_by, expires_at)
-  values (v_school, p_role, encode(extensions.digest(v_code, 'sha256'), 'hex'), v_user, now() + make_interval(days => p_expires_days));
+  values (v_school, p_role, encode(digest(v_code, 'sha256'), 'hex'), v_user, now() + make_interval(days => p_expires_days));
   return v_code;
 end;
 $$;
@@ -88,7 +88,7 @@ begin
 
   select * into v_invite
   from public.registration_invites
-  where code_hash = encode(extensions.digest(v_code, 'sha256'), 'hex')
+  where code_hash = encode(digest(v_code, 'sha256'), 'hex')
     and redeemed_at is null
     and expires_at > now()
   for update;
