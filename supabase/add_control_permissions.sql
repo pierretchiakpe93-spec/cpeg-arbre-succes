@@ -13,7 +13,12 @@ alter table public.role_permissions add constraint role_permissions_kind_check
 -- Préserve les anciens suivis de leçons/exercices dans leur nouveau type dédié.
 insert into public.school_records (school_id, kind, data, student_id, class_name, created_by)
 select p.school_id, 'controle',
-       p.data || jsonb_build_object('_migrated_from_presence_id', p.id::text),
+       jsonb_strip_nulls(jsonb_build_object(
+         'date', p.data->'date', 'eleve', p.data->'eleve', 'classe', p.data->'classe',
+         'lecon_sue', p.data->'lecon_sue', 'exercice_fait', p.data->'exercice_fait',
+         'lecons_par_matiere', p.data->'lecons_par_matiere',
+         'exercices_par_matiere', p.data->'exercices_par_matiere',
+         '_migrated_from_presence_id', to_jsonb(p.id::text))),
        p.student_id, p.class_name, p.created_by
 from public.school_records p
 where p.kind = 'presences'
@@ -24,6 +29,17 @@ where p.kind = 'presences'
     where c.kind = 'controle'
       and c.data->>'_migrated_from_presence_id' = p.id::text
   );
+
+-- Garde les anciennes lignes migrées au strict nécessaire, sans données d’absence/retard.
+update public.school_records
+set data = jsonb_strip_nulls(jsonb_build_object(
+  'date', data->'date', 'eleve', data->'eleve', 'classe', data->'classe',
+  'lecon_sue', data->'lecon_sue', 'exercice_fait', data->'exercice_fait',
+  'lecons_par_matiere', data->'lecons_par_matiere',
+  'exercices_par_matiere', data->'exercices_par_matiere',
+  '_migrated_from_presence_id', data->'_migrated_from_presence_id'
+))
+where kind = 'controle' and data ? '_migrated_from_presence_id';
 
 -- Les données de contrôle sont désormais protégées par leur autorisation propre.
 -- Retire uniquement les champs de contrôle des fiches de présence.
