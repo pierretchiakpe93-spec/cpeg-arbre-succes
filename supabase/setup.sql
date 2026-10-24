@@ -29,7 +29,7 @@ create table if not exists public.profiles (
 create table if not exists public.school_records (
   id uuid primary key default gen_random_uuid(),
   school_id uuid not null references public.schools(id),
-  kind text not null check (kind in ('eleves','enseignants','classes','notes','paiements','presences','controle')),
+  kind text not null check (kind in ('eleves','enseignants','classes','notes','paiements','presences','controle','fournitures')),
   data jsonb not null default '{}'::jsonb,
   student_id uuid references public.school_records(id) on delete set null,
   class_name text not null default '',
@@ -45,7 +45,7 @@ create index if not exists school_records_class on public.school_records(school_
 create table if not exists public.role_permissions (
   school_id uuid not null references public.schools(id),
   role text not null check (role in ('parent','enseignant','censeur','surveillant')),
-  kind text not null check (kind in ('eleves','enseignants','classes','notes','paiements','presences','controle')),
+  kind text not null check (kind in ('eleves','enseignants','classes','notes','paiements','presences','controle','fournitures')),
   can_read boolean not null default false,
   can_write boolean not null default false,
   primary key (school_id, role, kind)
@@ -76,7 +76,7 @@ select '00000000-0000-4000-8000-000000000001'::uuid, r.role, k.kind,
        end,
        (r.role = 'enseignant' and k.kind in ('notes','presences')) or (r.role = 'surveillant' and k.kind = 'presences')
 from (values ('parent'),('enseignant'),('censeur'),('surveillant')) as r(role)
-cross join (values ('eleves'),('enseignants'),('classes'),('notes'),('paiements'),('presences'),('controle')) as k(kind)
+cross join (values ('eleves'),('enseignants'),('classes'),('notes'),('paiements'),('presences'),('controle'),('fournitures')) as k(kind)
 on conflict (school_id, role, kind) do nothing;
 
 create or replace function public.current_school_id()
