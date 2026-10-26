@@ -6,7 +6,7 @@ create extension if not exists pgcrypto with schema extensions;
 create table if not exists public.registration_invites (
   id uuid primary key default gen_random_uuid(),
   school_id uuid not null references public.schools(id) on delete cascade,
-  role text not null check (role in ('parent','enseignant','censeur','surveillant')),
+  role text not null check (role in ('parent','enseignant','censeur','surveillant','fonde','comptable','secretaire')),
   code_hash text not null unique,
   created_by uuid not null references auth.users(id),
   created_at timestamptz not null default now(),
@@ -53,7 +53,7 @@ begin
   if v_school is null then
     raise exception 'Accès réservé à un administrateur actif.';
   end if;
-  if p_role not in ('parent','enseignant','censeur','surveillant') then
+  if p_role not in ('parent','enseignant','censeur','surveillant','fonde','comptable','secretaire') then
     raise exception 'Rôle d’invitation invalide.';
   end if;
   if p_expires_days < 1 or p_expires_days > 30 then

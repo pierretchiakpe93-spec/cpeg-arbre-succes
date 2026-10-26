@@ -21,7 +21,7 @@ create table if not exists public.profiles (
   user_id uuid primary key references auth.users(id) on delete cascade,
   school_id uuid not null references public.schools(id),
   full_name text not null default '',
-  role text not null check (role in ('admin','parent','enseignant','censeur','surveillant')),
+  role text not null check (role in ('admin','parent','enseignant','censeur','surveillant','fonde','comptable','secretaire')),
   active boolean not null default true,
   created_at timestamptz not null default now()
 );
@@ -44,7 +44,7 @@ create index if not exists school_records_class on public.school_records(school_
 
 create table if not exists public.role_permissions (
   school_id uuid not null references public.schools(id),
-  role text not null check (role in ('parent','enseignant','censeur','surveillant')),
+  role text not null check (role in ('parent','enseignant','censeur','surveillant','fonde','comptable','secretaire')),
   kind text not null check (kind in ('eleves','enseignants','classes','notes','paiements','presences','controle','fournitures')),
   can_read boolean not null default false,
   can_write boolean not null default false,
@@ -75,7 +75,7 @@ select '00000000-0000-4000-8000-000000000001'::uuid, r.role, k.kind,
          else false
        end,
        (r.role = 'enseignant' and k.kind in ('notes','presences')) or (r.role = 'surveillant' and k.kind = 'presences')
-from (values ('parent'),('enseignant'),('censeur'),('surveillant')) as r(role)
+from (values ('parent'),('enseignant'),('censeur'),('surveillant'),('fonde'),('comptable'),('secretaire')) as r(role)
 cross join (values ('eleves'),('enseignants'),('classes'),('notes'),('paiements'),('presences'),('controle'),('fournitures')) as k(kind)
 on conflict (school_id, role, kind) do nothing;
 
