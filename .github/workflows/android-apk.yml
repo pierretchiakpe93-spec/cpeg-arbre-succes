@@ -38,7 +38,7 @@ jobs:
         run: pnpm exec cap sync android
       - name: Build debug APK
         working-directory: android
-        run: ./gradlew assembleDebug
+        run: bash ./gradlew assembleDebug
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
