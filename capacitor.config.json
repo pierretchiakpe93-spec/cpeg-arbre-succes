@@ -1,0 +1,8 @@
+{
+  "appId": "bj.arbredesucces.gestion",
+  "appName": "CPEG L'Arbre de Succes",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  }
+}
