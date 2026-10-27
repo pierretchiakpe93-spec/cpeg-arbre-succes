@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">CS L&apos;ARBRE DE SUCCES</string>
-    <string name="title_activity_main">CS L&apos;ARBRE DE SUCCES</string>
+    <string name="app_name">CS L\'ARBRE DE SUCCES</string>
+    <string name="title_activity_main">CS L\'ARBRE DE SUCCES</string>
     <string name="package_name">bj.arbredesucces.gestion</string>
     <string name="custom_url_scheme">bj.arbredesucces.gestion</string>
 </resources>
