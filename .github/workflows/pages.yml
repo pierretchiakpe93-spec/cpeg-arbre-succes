@@ -44,6 +44,8 @@ jobs:
         run: bash ./gradlew assembleDebug
       - name: Add APK to downloadable site files
         run: cp android/app/build/outputs/apk/debug/app-debug.apk gestion/application.apk
+      - name: Add school logo to downloadable site files
+        run: cp android/app/src/main/res/drawable-nodpi/ic_launcher_logo.png gestion/school-logo.png
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload site
