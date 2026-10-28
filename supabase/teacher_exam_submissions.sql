@@ -29,8 +29,18 @@ create table if not exists public.teacher_exam_submissions (
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   )),
   created_by uuid not null references auth.users(id),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  document_type text not null default 'epreuve' check (document_type in ('epreuve','corrigee'))
 );
+
+-- Ajout idempotent pour les établissements qui avaient déjà créé la table.
+alter table public.teacher_exam_submissions
+  add column if not exists document_type text not null default 'epreuve';
+alter table public.teacher_exam_submissions
+  drop constraint if exists teacher_exam_submissions_document_type_check;
+alter table public.teacher_exam_submissions
+  add constraint teacher_exam_submissions_document_type_check
+  check (document_type in ('epreuve','corrigee'));
 create index if not exists teacher_exam_submissions_school_date
   on public.teacher_exam_submissions(school_id, created_at desc);
 create index if not exists teacher_exam_submissions_school_class
