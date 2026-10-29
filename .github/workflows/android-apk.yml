@@ -11,6 +11,7 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'scripts/copy-web.mjs'
+      - 'scripts/app-update.js'
       - '.github/workflows/android-apk.yml'
 
 jobs:
@@ -19,6 +20,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -36,13 +39,36 @@ jobs:
         run: pnpm run copy:web
       - name: Synchronize Android project
         run: pnpm exec cap sync android
-      - name: Build debug APK
+      - name: Check release signing secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64" || (echo "Missing repository secret ANDROID_KEYSTORE_BASE64" && exit 1)
+          test -n "$ANDROID_KEYSTORE_PASSWORD" || (echo "Missing repository secret ANDROID_KEYSTORE_PASSWORD" && exit 1)
+      - name: Prepare release signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release-signing-key.p12
+      - name: Find release key alias
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          alias=$(keytool -list -storetype PKCS12 -keystore android/app/release-signing-key.p12 -storepass "$ANDROID_KEYSTORE_PASSWORD" -v | sed -n 's/^Alias name: //p' | head -n 1)
+          test -n "$alias" || (echo "Could not read alias from release keystore" && exit 1)
+          echo "ANDROID_KEY_ALIAS=$alias" >> "$GITHUB_ENV"
+      - name: Build signed APK
         working-directory: android
-        run: bash ./gradlew assembleDebug
-      - name: Upload APK
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/android/app/release-signing-key.p12
+          ANDROID_KEYSTORE_TYPE: PKCS12
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: bash ./gradlew assembleRelease -PappVersionCode="$(git -C .. rev-list --count HEAD)"
+      - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: cpeg-arbre-succes-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: cpeg-arbre-succes-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
