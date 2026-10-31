@@ -17,28 +17,48 @@ function installSessionLock(client, messageElement) {
   const signUp = auth.signUp.bind(auth);
   const getSession = auth.getSession.bind(auth);
   const signOut = auth.signOut.bind(auth);
+  let checkingSession = false;
 
   async function claim(result) {
-    if (result.error || !result.data?.session) return result;
-    const { data, error } = await client.rpc('claim_device_session', { p_device_id: deviceId });
-    if (error) {
+    if (result.error || !result.data?.session || checkingSession) return result;
+    // client.rpc() récupère lui-même le jeton via auth.getSession(). L’appel
+    // imbriqué doit rendre la session brute pour éviter une récursion infinie.
+    checkingSession = true;
+    try {
+      const { data, error } = await client.rpc('claim_device_session', {
+        p_device_id: deviceId,
+      });
+      if (error) {
+        await signOut({ scope: 'local' });
+        return {
+          ...result,
+          data: { ...result.data, session: null, user: null },
+          error: new Error('Vérification de session impossible. Demandez de l’aide à l’administrateur.'),
+        };
+      }
+      if (data === true) return result;
+
       await signOut({ scope: 'local' });
-      return { ...result, data: { ...result.data, session: null, user: null }, error: new Error('Vérification de session impossible. Demandez de l’aide à l’administrateur.') };
+      return {
+        ...result,
+        data: { ...result.data, session: null, user: null },
+        error: new Error('Ce compte est déjà connecté sur un autre appareil. Déconnectez-le d’abord, puis réessayez.'),
+      };
+    } finally {
+      checkingSession = false;
     }
-    if (data === true) return result;
-    await signOut({ scope: 'local' });
-    return { ...result, data: { ...result.data, session: null, user: null }, error: new Error('Ce compte est déjà connecté sur un autre appareil. Déconnectez-le d’abord, puis réessayez.') };
   }
 
   auth.signInWithPassword = async (...args) => claim(await signIn(...args));
   auth.signUp = async (...args) => claim(await signUp(...args));
   auth.getSession = async (...args) => {
     const result = await getSession(...args);
-    if (!result.data?.session) return result;
+    if (!result.data?.session || checkingSession) return result;
     const checked = await claim(result);
     if (checked.error && messageElement) messageElement.textContent = checked.error.message;
     return checked.error ? { ...checked, data: { session: null, user: null } } : checked;
   };
+
   window.releaseDeviceSession = async () => {
     const { error } = await client.rpc('release_device_session', { p_device_id: deviceId });
     return error;
