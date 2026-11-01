@@ -1,10 +1,11 @@
-// Grille de saisie inspirée des fiches de notes papier de l'établissement.
+ // Grille de saisie inspirée des fiches de notes papier de l'établissement.
 const CPEG_NOTE_EVALUATIONS = [
   '1er inter', '2ème inter', '3ème inter', '4ème inter', '5ème inter',
   '1er devoir', '2ème devoir'
 ];
 const CPEG_EXAM_EVALUATIONS = ['Examen blanc 1', 'Examen blanc 2', 'Examen blanc 3', 'Examen blanc 4'];
-const CPEG_ALL_NOTE_EVALUATIONS = [...CPEG_NOTE_EVALUATIONS, ...CPEG_EXAM_EVALUATIONS];
+const CPEG_TRIMESTERS = ['1er trimestre', '2e trimestre', '3e trimestre'];
+const CPEG_EXAM_PERIOD = 'Examens blancs internes';
 const CPEG_NOTE_SUBJECTS = [
   ['ANGLAIS', 'Anglais'],
   ['ALLEMAND', 'Allemand'],
@@ -36,8 +37,16 @@ function cpegIsExamClass(className = '') {
   return /(?:^|\s)(?:3e|3eme|troisieme|tle|terminale)(?:\s|$)/.test(normalized);
 }
 
-function cpegNoteEvaluationsForClass(className = '') {
-  return cpegIsExamClass(className) ? CPEG_ALL_NOTE_EVALUATIONS : CPEG_NOTE_EVALUATIONS;
+function cpegNoteEvaluationsForClass() {
+  return CPEG_NOTE_EVALUATIONS;
+}
+
+function cpegNotePeriodsForClass(className = '') {
+  return cpegIsExamClass(className) ? [...CPEG_TRIMESTERS, CPEG_EXAM_PERIOD] : CPEG_TRIMESTERS;
+}
+
+function cpegEvaluationsForSelection(className, period) {
+  return period === CPEG_EXAM_PERIOD ? CPEG_EXAM_EVALUATIONS : cpegNoteEvaluationsForClass(className);
 }
 
 function cpegSubjectsForClass(className) {
@@ -78,18 +87,19 @@ async function notesEntryPage() {
   }
 
   if (!cpegNotesClasses.includes(cpegNotesClass)) cpegNotesClass = cpegNotesClasses[0] || '';
+  if (!cpegNotePeriodsForClass(cpegNotesClass).includes(cpegNotesTerm)) cpegNotesTerm = CPEG_TRIMESTERS[0];
   const classStudents = data.eleves.filter(student =>
     (student.classe || student.__class_name) === cpegNotesClass
   ).sort((a, b) => String(a.nom || '').localeCompare(String(b.nom || ''), 'fr', { sensitivity: 'base' }));
   const subjectOptions = cpegSubjectsForClass(cpegNotesClass);
-  const evaluations = cpegNoteEvaluationsForClass(cpegNotesClass);
+  const evaluations = cpegEvaluationsForSelection(cpegNotesClass, cpegNotesTerm);
   if (!subjectOptions.some(([key]) => key === cpegNotesSubject)) cpegNotesSubject = subjectOptions[0]?.[0] || '';
   const selectedSubject = subjectOptions.find(([key]) => key === cpegNotesSubject) || subjectOptions[0] || ['', ''];
   const teacherCanWrite = canWrite('notes');
   const canMakeBulletin = dbProfile?.role === 'admin';
 
   host.innerHTML = `
-    <div class="page-head"><div><h1>Notes</h1><p>Saisie par classe, matière et trimestre, selon les fiches de notes de l’école.</p></div>
+    <div class="page-head"><div><h1>Notes</h1><p>Saisie par classe, matière et période. Les examens blancs internes sont réservés aux classes de 3e et de Terminale.</p></div>
       ${canWrite('notes') ? `<button class="btn secondary" onclick="tablePage('notes')">Historique et import Excel</button>` : ''}</div>
     <div class="table-card notes-sheet-card">
       <div class="notes-sheet-controls">
@@ -99,13 +109,13 @@ async function notesEntryPage() {
         <label>Matière<select id="notesSheetSubject">
           ${subjectOptions.map(([key, label]) => `<option value="${esc(key)}" ${key === cpegNotesSubject ? 'selected' : ''}>${esc(label)}</option>`).join('')}
         </select></label>
-        <label>Trimestre<select id="notesSheetTerm">
-          ${['1er trimestre', '2e trimestre', '3e trimestre'].map(term => `<option value="${term}" ${term === cpegNotesTerm ? 'selected' : ''}>${term}</option>`).join('')}
+        <label>Période<select id="notesSheetTerm">
+          ${cpegNotePeriodsForClass(cpegNotesClass).map(period => `<option value="${esc(period)}" ${period === cpegNotesTerm ? 'selected' : ''}>${esc(period)}</option>`).join('')}
         </select></label>
         ${canMakeBulletin ? `<button class="btn secondary" type="button" onclick="notesBulletinPage()">Préparer les bulletins</button>` : ''}
       </div>
       <p class="notes-sheet-help">Saisissez les notes sur 20. Les cases vides restent sans note. Les élèves affichés sont ceux de la classe sélectionnée.</p>
-      ${cpegIsExamClass(cpegNotesClass) ? '<p class="notes-sheet-help">Classe d’examen : les quatre examens blancs sont disponibles après les devoirs.</p>' : ''}
+      ${cpegNotesTerm === CPEG_EXAM_PERIOD ? '<p class="notes-sheet-help">Saisissez ici les notes des quatre examens blancs internes. Elles sont séparées des notes trimestrielles.</p>' : ''}
       ${classStudents.length ? `<div class="table-wrap notes-sheet-wrap"><table class="notes-sheet-table"><thead><tr><th>N°</th><th>Nom et prénom(s) de l’élève</th>${evaluations.map(label => `<th>${label}</th>`).join('')}</tr></thead>
         <tbody>${classStudents.map((student, index) => `<tr><td>${index + 1}</td><td>${esc(student.nom || '')}</td>${evaluations.map(evaluation => {
           const record = cpegGradeRecord(student, cpegNotesClass, selectedSubject[0], cpegNotesTerm, evaluation);
@@ -135,15 +145,17 @@ function notesBulletinPage() {
   const classes = [...new Set([...data.classes.map(row => row.nom), ...data.eleves.map(row => row.classe || row.__class_name)].filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, 'fr', { numeric: true }));
   if (!classes.includes(cpegNotesClass)) cpegNotesClass = classes[0] || '';
+  if (!cpegNotePeriodsForClass(cpegNotesClass).includes(cpegNotesTerm)) cpegNotesTerm = CPEG_TRIMESTERS[0];
   const subjectOptions = cpegSubjectsForClass(cpegNotesClass);
+  const periods = cpegNotePeriodsForClass(cpegNotesClass);
   host.innerHTML = `
-    <div class="page-head"><div><h1>Bulletins trimestriels</h1><p>Préparez un bulletin imprimable pour chaque élève de la classe.</p></div><button class="btn secondary" onclick="notesEntryPage()">Retour aux notes</button></div>
+    <div class="page-head"><div><h1>Bulletins et résultats</h1><p>Préparez un bulletin imprimable pour chaque élève de la classe.</p></div><button class="btn secondary" onclick="notesEntryPage()">Retour aux notes</button></div>
     <div class="table-card" style="padding:18px">
       <div class="notes-sheet-controls" style="padding:0">
         <label>Classe<select id="bulletinClass">${classes.map(name => `<option value="${esc(name)}" ${name === cpegNotesClass ? 'selected' : ''}>${esc(name)}</option>`).join('')}</select></label>
-        <label>Trimestre<select id="bulletinTerm">${['1er trimestre', '2e trimestre', '3e trimestre'].map(term => `<option value="${term}" ${term === cpegNotesTerm ? 'selected' : ''}>${term}</option>`).join('')}</select></label>
+        <label>Période<select id="bulletinTerm">${periods.map(period => `<option value="${esc(period)}" ${period === cpegNotesTerm ? 'selected' : ''}>${esc(period)}</option>`).join('')}</select></label>
       </div>
-      <p class="notes-sheet-help" style="margin-left:0">Moyenne par matière = (moyenne des interrogations + 1er devoir + 2e devoir) ÷ 3. La moyenne des interrogations est calculée avec les notes saisies. Une moyenne de matière reste vide tant qu’il manque une interrogation ou l’un des deux devoirs.</p>
+      <p class="notes-sheet-help" style="margin-left:0">${cpegNotesTerm === CPEG_EXAM_PERIOD ? 'Les examens blancs restent séparés des bulletins trimestriels. La fiche affiche les notes de 1 à 4 et leur moyenne par matière.' : 'Moyenne par matière = (moyenne des interrogations + 1er devoir + 2e devoir) ÷ 3. Les examens blancs internes peuvent être consultés dans la période correspondante.'}</p>
       <button class="btn primary" type="button" onclick="printNotesBulletins()">Générer les bulletins imprimables</button>
     </div>`;
   document.getElementById('bulletinClass')?.addEventListener('change', event => {
@@ -155,6 +167,50 @@ function notesBulletinPage() {
   });
 }
 
+function printExamBlancBulletins(className, students, subjectOptions) {
+  const readScore = (student, subject, evaluation) => {
+    const record = cpegGradeRecord(student, className, subject, CPEG_EXAM_PERIOD, evaluation);
+    if (!record || String(record.note ?? '').trim() === '') return null;
+    const value = Number(String(record.note).replace(',', '.'));
+    return Number.isFinite(value) ? value : null;
+  };
+  const mean = values => {
+    const present = values.filter(value => value !== null);
+    return present.length ? present.reduce((sum, value) => sum + value, 0) / present.length : null;
+  };
+  const summaries = students.map(student => {
+    const subjects = subjectOptions.filter(([key]) => key !== 'Conduite').map(([key, label]) => {
+      const scores = CPEG_EXAM_EVALUATIONS.map(evaluation => readScore(student, key, evaluation));
+      return { label, scores, average: mean(scores) };
+    });
+    return { student, subjects, overall: mean(subjects.map(subject => subject.average).filter(value => value !== null)) };
+  });
+  if (!summaries.some(row => row.overall !== null)) {
+    notify('Aucune note d’examen blanc n’a été enregistrée pour cette classe.');
+    return;
+  }
+  const popup = window.open('', '_blank');
+  if (!popup) { notify('Autorisez les fenêtres contextuelles pour générer les résultats.'); return; }
+  const format = value => value === null ? '—' : value.toFixed(1).replace('.', ',');
+  const appreciation = value => value === null ? 'Notes à compléter.'
+    : value >= 16 ? 'Excellent travail, élève sérieux et appliqué.'
+    : value >= 14 ? 'Très bon travail. Continue ainsi.'
+    : value >= 12 ? 'Bon travail, des efforts réguliers à poursuivre.'
+    : value >= 10 ? 'Ensemble satisfaisant, peut encore progresser.'
+    : 'Résultats insuffisants. Des efforts soutenus sont attendus.';
+  const pages = summaries.map(({ student, subjects, overall }) => {
+    const parts = String(student.nom || '').trim().split(/\\s+/);
+    const surname = student.nom_famille || parts[0] || '';
+    const first = student.prenoms || student.prénom || student.first_name || parts.slice(1).join(' ');
+    const rows = subjects.map(subject => "<tr><th>" + esc(subject.label) + "</th>" + subject.scores.map(score => "<td>" + format(score) + "</td>").join('') + "<td><b>" + format(subject.average) + "</b></td><td>" + esc(appreciation(subject.average)) + "</td></tr>").join('');
+    const headers = CPEG_EXAM_EVALUATIONS.map(label => "<th>" + esc(label) + "</th>").join('');
+    return "<article><header><h1>CS L’ARBRE DE SUCCÈS</h1><h2>RÉSULTATS DES EXAMENS BLANCS INTERNES</h2><p>Année scolaire " + esc(currentYear()) + "</p></header><section><b>Élève :</b> " + esc(surname) + " " + esc(first) + "<br><b>Classe :</b> " + esc(className) + "</section><table><thead><tr><th>Matière</th>" + headers + "<th>Moyenne</th><th>Appréciation</th></tr></thead><tbody>" + rows + "</tbody></table><p class=\"overall\">Moyenne générale des examens blancs : <b>" + format(overall) + " / 20</b></p></article>";
+  }).join('');
+  popup.document.open();
+  popup.document.write("<!doctype html><html lang=\"fr\"><head><meta charset=\"utf-8\"><title>Examens blancs - " + esc(className) + "</title><style>@page{size:A4 portrait;margin:12mm}*{box-sizing:border-box}body{font:11px Arial,sans-serif;color:#162b4f}article{page-break-after:always;min-height:270mm}article:last-child{page-break-after:auto}header{text-align:center;border-bottom:4px solid #168453;padding-bottom:8px}h1{margin:0;color:#16447e}h2{background:#16447e;color:#fff;padding:8px;font-size:16px}section{margin:16px 0;line-height:1.8}table{width:100%;border-collapse:collapse}th,td{border:1px solid #9eafc2;padding:7px;text-align:center}thead{background:#16447e;color:#fff}tbody th{text-align:left}.overall{margin-top:18px;padding:10px;background:#eef7f0}.overall b{font-size:15px}</style></head><body>" + pages + "<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),300));</script></body></html>");
+  popup.document.close();
+}
+
 function printNotesBulletins() {
   if (dbProfile?.role !== 'admin') return;
   const className = document.getElementById('bulletinClass')?.value || '';
@@ -163,6 +219,7 @@ function printNotesBulletins() {
     .sort((a, b) => String(a.nom || '').localeCompare(String(b.nom || ''), 'fr', { sensitivity: 'base' }));
   if (!students.length) { notify('Aucun élève n’est enregistré dans cette classe.'); return; }
   const subjectOptions = cpegSubjectsForClass(className);
+  if (term === CPEG_EXAM_PERIOD) { printExamBlancBulletins(className, students, subjectOptions); return; }
   const getScores = (student, subject) => CPEG_NOTE_EVALUATIONS.map(evaluation => {
     const note = cpegGradeRecord(student, className, subject, term, evaluation);
     if (!note || String(note.note ?? '').trim() === '') return null;
@@ -208,7 +265,7 @@ function printNotesBulletins() {
     ].filter(group => group.items.length);
     const exams = examClass ? subjectOptions.filter(([key]) => key !== 'Conduite').map(([key, label]) => {
       const scores = CPEG_EXAM_EVALUATIONS.map(evaluation => {
-        const record = cpegGradeRecord(student, className, key, term, evaluation);
+        const record = cpegGradeRecord(student, className, key, CPEG_EXAM_PERIOD, evaluation) || cpegGradeRecord(student, className, key, term, evaluation);
         if (!record || String(record.note ?? '').trim() === '') return null;
         const value = Number(String(record.note).replace(',', '.'));
         return Number.isFinite(value) ? value : null;
