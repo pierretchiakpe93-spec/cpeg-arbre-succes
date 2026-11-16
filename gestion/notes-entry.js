@@ -122,7 +122,6 @@ async function notesEntryPage() {
           return `<td><input class="notes-grade-input" type="text" inputmode="decimal" aria-label="${esc(evaluation)} - ${esc(student.nom || '')}" data-student-id="${esc(student.__id || '')}" data-student-name="${esc(student.nom || '')}" data-evaluation="${esc(evaluation)}" value="${esc(record?.note ?? '')}" ${teacherCanWrite ? '' : 'disabled'}></td>`;
         }).join('')}</tr>`).join('')}</tbody></table></div>` : `<div class="empty notes-sheet-empty">${cpegNotesClass ? 'Aucun élève enregistré dans cette classe.' : 'Aucune classe accessible. Demandez à l’administration de vous attribuer une classe.'}</div>`}
       <div class="notes-sheet-footer"><span>${classStudents.length} élève(s) · ${esc(selectedSubject[1])} · ${esc(cpegNotesTerm)}</span>
-        ${dbProfile?.role === 'admin' && classStudents.length ? `<button class="btn secondary" type="button" onclick="deleteNotesEvaluation()">Supprimer une épreuve</button>` : ''}
         ${teacherCanWrite && classStudents.length ? `<button class="btn primary" type="button" onclick="saveNotesSheet()">Enregistrer les notes</button>` : ''}</div>
     </div>`;
 
@@ -138,30 +137,6 @@ async function notesEntryPage() {
     cpegNotesTerm = event.target.value;
     notesEntryPage();
   });
-}
-
-async function deleteNotesEvaluation() {
-  if (dbProfile?.role !== 'admin') return;
-  const evaluations = cpegEvaluationsForSelection(cpegNotesClass, cpegNotesTerm);
-  const chosen = window.prompt(`Quelle épreuve supprimer pour ${cpegNotesClass} · ${cpegNotesSubject} · ${cpegNotesTerm} ?\n\n${evaluations.map((name, i) => `${i + 1}. ${name}`).join('\n')}\n\nSaisissez son numéro.`);
-  if (chosen === null) return;
-  const evaluation = evaluations[Number(chosen) - 1];
-  if (!evaluation) { notify('Numéro d’épreuve invalide.'); return; }
-  const records = data.notes.filter(note =>
-    (note.classe || note.__class_name) === cpegNotesClass &&
-    note.matiere === cpegNotesSubject && note.periode === cpegNotesTerm &&
-    note.evaluation === evaluation
-  );
-  if (!records.length) { notify('Aucune note enregistrée pour cette épreuve.'); return; }
-  if (!confirm(`Supprimer ${evaluation} — ${cpegNotesSubject} — ${cpegNotesClass} — ${cpegNotesTerm} ? Cela effacera les notes de ${records.length} élève(s).`)) return;
-  const ids = records.map(note => note.__id).filter(Boolean);
-  if (ids.length !== records.length) { notify('Suppression impossible : certaines notes n’ont pas d’identifiant.'); return; }
-  const { error } = await supabaseClient.from('school_records').delete()
-    .eq('school_id', dbProfile.school_id).eq('kind', 'notes').in('id', ids);
-  if (error) { notify('Suppression refusée : ' + error.message); return; }
-  data.notes = data.notes.filter(note => !records.includes(note));
-  notify(`${evaluation} supprimé pour ${records.length} élève(s).`);
-  await notesEntryPage();
 }
 
 function notesBulletinPage() {
