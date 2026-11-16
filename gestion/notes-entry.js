@@ -52,7 +52,7 @@ function cpegEvaluationsForSelection(className, period) {
 function cpegSubjectsForClass(className) {
   const normalized = cpegNotesKey(className);
   if (/^6e(?:me)?(?:\s|$)/.test(normalized)) {
-    return CPEG_NOTE_SUBJECTS.filter(([key]) => !['FRANCAIS LECTURE', 'Conduite'].includes(key));
+    return CPEG_NOTE_SUBJECTS.filter(([key]) => key !== 'Conduite');
   }
   return CPEG_NOTE_SUBJECTS;
 }
